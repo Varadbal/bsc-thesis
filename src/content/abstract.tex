@@ -1,0 +1,51 @@
+\pagenumbering{roman}
+\setcounter{page}{1}
+
+\selecthungarian
+
+%----------------------------------------------------------------------------
+% Abstract in Hungarian
+%----------------------------------------------------------------------------
+\chapter*{Kivonat}\addcontentsline{toc}{chapter}{Kivonat}
+
+Mindennapi életünk során körülvesznek minket a beágyazott rendszerek. Ezek jelentős része biztonságkritikus rendszer, melyek hibás működése szerencsés esetben komoly anyagi károkhoz vezet, de akár emberéleteket is veszélyeztethet. Az utóbbi időben rohamosan nőtt ezen rendszerek komplexitása, ennek ellensúlyozására egyre inkább teret hódítanak a modell-alapú fejlesztési paradigmák. Ezek számos előnye között szerepel, hogy a rendszermodellekből automatikusan származtathatóak bizonyos dokumentumok, mint dokumentáció, implementáció vagy egyéb, formális verifikációhoz alkalmazható modellek. Ez azonban azt feltételezi, hogy a modellek rendelkeznek pontosan definiált szemantikával, ami rendszerint nem igaz a mérnöki munka során alkalmazott modellekre -- sokszor szándékosan, néha viszont nem.
+
+A helyes működés bizonyításának lehetősége alapvető fontosságú követelmény biztonságkritikus rendszerek tervezésekor. A tesztelésen kívül formális módszerek is alkalmazhatóak a viselkedés helyességének kimerítő és automatizált elemzéséhez, rendszerint már a rendszer fejlesztési folyamatának korai szakaszában is. Ennek egy gyakran alkalmazott módja a modellellenőrzés, melynek során az alkalmazott ellenőrző eszköz a rendszer állapotterét kimerítően elemzi. Ez kézenfekvő módja az állapot alapú modellek vizsgálatának is, melyeket gyakran alkalmazzák reaktív rendszerek belső viselkedésének modellezésére.
+
+A Gamma Állapotgép Kompozíciós Keretrendszer egy szoftverfejlesztést segítő keretrendszer, mely támogatja a modellvezérelt szoftverfejlesztés paradigmáit. Az elkészített modellek vizsgálatához rejtett formális módszereket alkalmaz azáltal, hogy a támogatott magas szintű modellező elemek szemantikáját precízen és formálisan verifikálható módon definiálja. Jelenleg a külvilág eseményeire adható reakciókat leíró nyelve erősen korlátozott. 
+
+Jelen dolgozat célja egy formálisan verifikálható akciónyelv tervezése állapot alapú modellek számára, majd ennek integrálása a Gamma Keretrendszerbe. A nyelvnek képesnek kell lennie a rendszer reakcióinak részletezésére, mégpedig kellően nagy kifejezőerővel ahhoz, hogy le tudja írni a beágyazott rendszerektől elvárható viselkedést, ugyanakkor formális verifikációra alkalmasnak is kell maradnia. Ez azt jelenti, hogy a nyelvnek a véges állapotgép formalizmus határain belül kell maradnia, miközben támogatnia kell magas szintű nyelvi elemeket a kifejezőképesség növeléséhez. Ezt úgy érjük el, hogy megvizsgálunk különböző eszközöket, melyek alkalmasak reaktív beágyazott rendszerek modellezésére és így szerzett tapasztalataink alapján olyan nyelvi elemeket definiálunk, melyek nem lehetetlenítik el a formális verifikációt.
+
+A másik szempont, amit figyelembe kellett vennünk a nyelv tervezése során a precízen definiált szemantika szükségessége a definiált nyelvi elemek számára. Ezt denotációs szemantika megadásával érjük el, vagyis definiáljuk a transzformációt egy másik formalizmusra. Ezen transzformációk célja a jelenleg kísérleti xSTS formalizmus, amelyet a Theta Keretrendszer fog tudni verifikálni. Ezen kívül Java kód is generálható belőle egyszerűen, amint azt látni fogjuk.  
+
+A nyelv széleskörű funkcionalitását, alkalmazhatóságát és korlátait egy esettanulmány során vizsgáljuk, melyben egy RPN számológépet modellezünk.
+
+\vfill
+\selectenglish
+
+
+%----------------------------------------------------------------------------
+% Abstract in English
+%----------------------------------------------------------------------------
+\chapter*{Abstract}\addcontentsline{toc}{chapter}{Abstract}
+
+In our everyday lives, we are surrounded with embedded systems. A siginificant proportion of these systems is safety-critical, such as cars, trains, airplanes, etc. The faulty behavior of these systems could result in at least serious financial losses, if not threaten human lives. As these systems are getting more and more complex, the application of the \textit{model-driven paradigms} is gaining more and more ground in their development processes. Among its numerous advantages, model-driven software development enables the generation of various artifacts based on the system model, such as documentation, implementation and different models suitable for verification. This however, assumes precisely defined semantics, which is often missing in models used in engineering, at times intentionally, at times not.
+
+The feasibility of proving the correctness of a model is an important requirement when designing safety-critical systems. In addition to testing, \textit{formal methods} can be applied to verify the correctness of behavior exhaustively and automatically, even in the early phases of designing systems. A common means of formal verification is \textit{model checking}, during which the state-space of the given system is exhaustively analyzed. It is also convenient for the analysis of state-based models, which are commonly used in engineering to model the behavior of reactive systems.
+
+The Gamma Statechart Composition Framework is a software development framework supporting the model-driven software development paradigm. It applies hidden formal methods to the created models by supporting modeling on higher abstraction levels with precisely defined, formally verifiable semantics. However, its language for describing actions in reaction to various events of the outside world is strongly limited.
+
+The goal of this work is to design a formally verifiable action language for state-based models and integrate it into the Gamma Framework. The language should be able to detail the reactions of the system with a great enough expressive power to describe the behavior common to embedded systems, but it should also be formally verifiable. This means, that the language must stay within the boundaries of finite-state machines, but also support high-level language elements to increase its expressive power. This is achieved by analyzing tools applicable for the modeling of reactive embedded systems and defining language elements based on constructs observed in them that do not inhibit formal verifiability.
+
+Another aspect that had to be taken into account is the precise definition of the semantics of the language elements. This is done by providing denotational semantics for each one of them by defining model transformations to the experimental xSTS formalism used by the Theta Framework, which can be used for formal verification and also Java code generation, as demonstrated in this work.
+
+The extensive functionality, applicability and boundaries of the language are demonstrated through a case study of an RPN calculator.
+
+
+
+\vfill
+\selectthesislanguage
+
+\newcounter{romanPage}
+\setcounter{romanPage}{\value{page}}
+\stepcounter{romanPage}

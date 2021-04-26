@@ -1,0 +1,60 @@
+%----------------------------------------------------------------------------
+\chapter{\bevezetes} \label{chapter_intro}
+%----------------------------------------------------------------------------
+
+Due to the increasing complexity of embedded systems, and software systems in general, the design, implementation and analysis of these systems is getting more and more difficult directly handling the source code. Thus, the modeling of these systems should happen on a higher level of abstraction. One feasible way to implement that is the so-called \textit{model-driven development} paradigm, which will be detailed in Section \ref{section_background_MDSD}, along with a way to verify the correctness of these models through formal verification methods, detailed in Section \ref{section_background_FORM}. This is the motivation of the framework deatiled in \cite{GammaVince2018} and briefly discussed in section \ref{section_background_target}, to which a formally verifiable action language is going to be introduced.
+%----------------------------------------------------------------------------
+\section{Challenges} \label{section_intro_challenges}
+%----------------------------------------------------------------------------
+Due to the application of the modeling concept in several completely different domains, first of all, we need to define the meaning of \textit{model} in this document.
+\begin{definition}[Model]
+	A model is the simplified image of an element of the real or a hypothetical world (the system), that replaces the the system in certain considerations. [REMO előadásból]
+\end{definition}
+
+For a model to be interpretable, executable or formally verifiable, it must be described according to the predefined rules of model creation in the given domain. This set of rules is provided by \textit{modeling languages}.
+\begin{definition}[Modeling Language]
+	A modeling language consists of the following elements:
+	\begin{itemize}
+		\item \emph{Metamodel:} a model defining the building blocks of the modeling language as well
+		as their relationships.
+		\item \emph{Concrete syntax:} a set of rules defining a graphical or textual notation for the
+		element and connection types defined in the metamodel.
+		\item \emph{Well-formedness constraints:} a set of constraints that models have to meet in order
+		to be deemed valid in the modeling language.
+		\item \emph{Semantics:} a set of rules that define the meaning of the element and connection
+		types defined in the metamodel. Semantics can be either \textit{operational} (what should happen during execution) or \textit{denotational} (given by translating concepts in a modeling language to another modeling language with a well-defined semantics). [FORM]
+	\end{itemize}
+\end{definition}
+In case that a part of the modeling language is missing or not precise enough - which is often the case for modeling languages used in engineering - a transformation must be made from the given model to a formal, often mathematical model in order for the model to be executable.
+
+The most practical way of modeling reactive systems is the \textit{statechart} formalism, which will be discussed in detail in Section \ref{section_background_statechart}. Naturally, these systems can also be described using several other kinds of \textit{behavioral models}. The reason for this practicality is the relative simplicity and visual representation of the models, that facilitates not only the design, but also the verification of these systems. 
+
+In theory, it would be possible to automatically generate source code and formally verify the correctness of behavior solely using the models of a given system. This is the goal of the \textit{model-driven software development} methodology, detailed in section \ref{section_background_MDSD}. However, engineering models made for a certain purpose (e.g. communication, visualization or documentation) often lack the precisely defined semantics, or at times even syntax required for these purposes. In some cases, like the UML 2.1.2 standard, \textit{"implementors may provide [...] informal feature support statements [...] for less precisely defined dimensions such as presentation options and semantic variation points"} \cite{UMLStandard212}, which feature deliberately discards the mathematical strictness in exchange for ease of communication. Attempts have been made to tackle this problem and define variability within modeling languages, for instance in \cite{VariabilityInModelingLanguages}.
+
+Some modeling languages, especially in mathematics, possess not only the syntax and metamodel, but also the semantics and well-formedness constraints in a strict mathematical manner. Examples for these models include most mathematical models of computation (Turing machine, finite-state machine) and also the extended timed automata of the UPPAAL tool. The drawback of these models is the cumbersome application for engineering tasks, as these models operate on lower abstraction levels, with limited expressive power and strongly mathematical syntax.
+
+One of the goals of the action language introduced in this document is to address this seemingly contradictory situation and extend the above mentioned tool with a both mathematically precise and from an engineering standpoint convenient feature.
+
+%----------------------------------------------------------------------------
+\section{Features of the Action Language} \label{section_intro_features}
+%----------------------------------------------------------------------------
+
+An important aspect taken into account when designing the action language was the ease of use by means of supporting well-known control statements and data structures of 3rd generation programming languages. Examples for these control statements are the \textit{if-else}, \textit{switch-case} and \textit{for} statements. For data structures, currently \textit{array} (indexable groups of variables of the same type) and \textit{record} types (groups of variables of possibly different types) are supported in addition to primitive types. This results in a C-like programming language, with some features resembling the UML textual syntax.
+
+The expressive power of this language is fairly high. Turing completeness is not possible for reasons discussed in Section \ref{section_background_behaviorModeling}. This, however, still allows for complex control structures and high-level control statements.
+
+The language is efficiently verifiable using formal methods. Due to not being computationally complete, the algorithms written in this action language are always \textit{decidable} (i.e. guaranteed to terminate). Thus, it is possible for a model checker to exhaustively analyze the state-space of the system and prove or disprove its correctness of functionality.
+
+It is integrated into the Gamma Statechart Composition Framework (see section \ref{section_background_target}), which provides the language with a type- and expression language as well as extends it with tool-specific elements (e.g. events, timeouts). The automated transformation to Java and XSTS code [REF CHAPTER WHERE INTRODUCED] of the system modeled using this toolkit is also readily available to the user. 
+
+
+%----------------------------------------------------------------------------
+\section{Overview} \label{section_intro_overview}
+%----------------------------------------------------------------------------
+To describe the reactions of to the events of the outside world in state-based models (see section \ref{section_background_behaviorModeling}), an action language that describes the process of the reaction of the system is required. The language should be able to describe the behavior common to embedded systems, but it should also enable formal verification of the modeled system. Naturally, it cannot be a Turing-complete language, as the termination of such programs is undecidable. In the following chapters, one possible implementation of such a language is going to be detailed. This language supports control structures of high-level general-purpose programming languages and the correctness or incorrectness of the program implemented in it is also decidable in every case with the help of an appropriate model checker.
+
+Chapter \ref{chapter_background} deals with the background of the work. Precise definitions are given for the relevant formalisms as well as the corresponding formal verification techniques. Then, action languages of existing tools are analyzed with special regard to their expressive power and verification possibilities. Also, a brief summary of the target frameworks is given.
+In Chapter \ref{chapter_theoreticalResults} the above mentioned action language is detailed. First of all, the syntax and semantics of the language elements, then the validation rules that support the modeling process by finding design flaws as early as possible during the development of a system. After that, the transformation of the \textit{abstract syntax tree} into various other models is discussed, with special attention to executable source code and verification possibilities.
+Chapter \ref{chapter_implementation} gives a brief summary of the exploited technologies, respectively: EMF, Xtext, Xtend, VIATRA.
+Chapter \ref{chapter_results} gives a case study for the application of the described language. Lastly, the semantics of each of the language elements and the transformations are verified.
+

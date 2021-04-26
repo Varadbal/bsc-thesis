@@ -1,0 +1,382 @@
+%----------------------------------------------------------------------------
+\appendix
+%----------------------------------------------------------------------------
+%\chapter*{\fuggelek}\addcontentsline{toc}{chapter}{\fuggelek}
+%\setcounter{chapter}{\appendixnumber}
+%\setcounter{equation}{0} % a fofejezet-szamlalo az angol ABC 6. betuje (F) lesz
+%\numberwithin{equation}{section}
+%\numberwithin{figure}{section}
+%\numberwithin{lstlisting}{section}
+%\numberwithin{tabular}{section}
+
+\chapter{Action Language}
+%----------------------------------------------------------------------------
+\section{Overview of the Action Language}
+%----------------------------------------------------------------------------
+\bigskip
+\begin{lstlisting} [language=tex,caption=Overivew of the syntax of the action language,label=lst:SCActionLanguageOverview]
+	Action = Statement | Block ;
+	
+	Block = '{'
+						{Action}
+					'}' 
+					;
+					
+	Statement = VariableDeclarationStatement |
+							ConstantDeclarationStatement | 
+							ExpressionStatement |
+							AssignmentStatement |
+							RaiseEventAction |
+							SetTimeoutDeclaration |
+							DeactivateTimeoutDeclaration |
+							IfStatement |
+							ChoiceStatement |
+							ReturnStatement |
+							BreakStatement |
+							SwitchStatement |
+							ForStatement |
+							AssertionStatement
+							;		
+\end{lstlisting}
+
+%----------------------------------------------------------------------------
+\chapter{Model Transformations}
+%----------------------------------------------------------------------------
+\newpage
+%----------------------------------------------------------------------------
+\section{Overview of the High-level-to-Low-level Transformation}
+%----------------------------------------------------------------------------
+\begin{table}[H]
+	%\footnotesize
+	\centering
+	\renewcommand{\arraystretch}{1.5}
+	\begin{tabular}{ | l | l | }
+		\toprule
+		\textbf{High-level} & \textbf{Low-level} \\
+		\hline
+		\midrule
+		Variable Declaration Statement & Variable Declaration Statement(s) \\ \hline
+		Constant Declaration Statement & Variable Declaration Statement(s) \\ \hline
+		Parameter Declaration & Variable Declaration and Assignment Statement(s) \\ \hline
+		Expression Statement & Empty Action or Variable Declaration, Assignment, \\
+		& possibly If and Choice Statements\\ \hline
+		Reference Expression & (simple) Reference Expression or Variable \\ 
+		& Declaration, Assignment and If Statement(s)\\ \hline
+		Block & Block \\ \hline
+		If Statement & Variable Declarations, Assignments and \\ 
+		& an If Statement  \\ \hline
+		Choice Statement & Variable Declarations, Assignments and \\
+		& a Choice Statement \\ \hline
+		Break Statement & -- \\ \hline
+		Return Statement & Assignment Statement or -- \\ \hline
+		Switch Statement & Variable Declarations, Assignments and \\
+		& an If Statement \\ \hline
+		For Statement & Variable Declarations, Assignments  \\ 
+		& (possibly If or Choice Statements)\\ \hline
+		Set Timeout Action & Assignment Statement \\ \hline
+		Deactivate Timeout Action & Not yet transformed \\ \hline
+		Raise Event Action & Assignment Statement(s) \\ \hline
+		Empty Statement & Empty Statement \\ \hline
+		\bottomrule
+	\end{tabular}
+	\caption{Overview of the high-level-to-low-level action transformation}
+	\label{tab:SCLLOverview}
+\end{table}
+
+%----------------------------------------------------------------------------
+\section{Overview of the Low-level-to-xSTS Transformation}
+%----------------------------------------------------------------------------
+\begin{table}[H]
+	%\footnotesize
+	\centering
+	\renewcommand{\arraystretch}{1.5}
+	\begin{tabular}{ | l | l |}
+		\toprule
+		\textbf{High-level Element} & \textbf{xSTS Element(s)} \\ \hline
+		\midrule
+		Variable Declaration Statement & Empty Statement, temporary Variable Declaration \\ \hline
+		Reference Expression & Reference Expression \\ \hline
+		Variable Initializing Expression & Variable Initializing Expression \\ \hline
+		Assignment Statement & Assignment Action\\ \hline
+		Block & Sequential Action \\ \hline
+		If Statement & Non-deterministic Action with Sequential Action(s) \\
+		& and Assume Action(s) \\ \hline
+		Choice Statement & Non-deterministic Action and Sequential Action(s) \\
+		& and Assume Actions(s) \\ \hline
+		Empty Statement & Empty Statement \\ \hline
+		\bottomrule
+	\end{tabular}
+	\caption{Overview of the low-level statechart-to-xSTS transformation}
+	\label{tab:LLXSTSOverview}
+\end{table}
+
+%----------------------------------------------------------------------------
+\chapter{Validation and Case Study}
+%----------------------------------------------------------------------------
+\newpage
+%----------------------------------------------------------------------------
+\section{Testing the Language Elements}
+%----------------------------------------------------------------------------
+\begin{table}[H]
+	\footnotesize
+	\centering
+	\begin{tabular}{ l l l }
+		\toprule
+		Test Suite & Test Case & Result \\
+		\midrule
+		Raise Events & Test one simple event & \textcolor{green}{Passed}\\
+		& Test two simple events & \textcolor{green}{Passed}\\
+		& Test one parametric event & \textcolor{green}{Passed}\\
+		Variable Declarations & test one integer variable (with initialization) & \textcolor{green}{Passed}\\
+		& Test one boolean variable (with initialization) & \textcolor{green}{Passed}\\
+		& Test one integer array variable (with initialization) & \textcolor{green}{Passed}\\
+		& Test one boolean variable (with initialization) & \textcolor{green}{Passed}\\
+		& Test one record variable (with initialization) & \textcolor{green}{Passed}\\
+		& Test one enum variable (with initialization) & \textcolor{green}{Passed}\\
+		Constant Declarations & Same as the cases of variable declarations & \textcolor{gray}{Not tested}\\
+		Expression Statements & Either at the procedures or cannot be tested & \textcolor{gray}{Not tested}\\
+		Assignment Statements & Test \textit{integer reference := integer literal} & \textcolor{green}{Passed}\\
+		& Test \textit{integer reference := integer reference} & \textcolor{green}{Passed}\\
+		& Test \textit{integer reference := integer function} & \textcolor{red}{Failed}\\
+		& Test \textit{integer reference := record-integer} & \textcolor{green}{Passed}\\
+		& Test \textit{integer reference := array-integer} & \textcolor{green}{Passed}\\
+		& Test \textit{array-integer := integer reference} & \textcolor{green}{Passed}\\
+		& Test \textit{record-integer := integer reference} & \textcolor{green}{Passed}\\
+		If Statements & Test \textit{if(true)} & \textcolor{green}{Passed}\\
+		& Test \textit{if(false)} & \textcolor{green}{Passed}\\
+		& Test \textit{if(true reference)} & \textcolor{green}{Passed}\\
+		& Test \textit{if(false reference)} & \textcolor{green}{Passed}\\
+		& Test \textit{if(true)else} & \textcolor{green}{Passed}\\
+		& Test \textit{if(false)else} & \textcolor{green}{Passed}\\
+		& Test \textit{if(true)elsif(true)} & \textcolor{green}{Passed}\\
+		& Test \textit{if(false)elsif(false)} & \textcolor{green}{Passed}\\
+		& Test \textit{if(false)elsif(true)} & \textcolor{gray}{Not tested}\\
+		& Test \textit{if(true){if(true)}} & \textcolor{green}{Passed}\\
+		& Test \textit{if(true)if(true)} & \textcolor{green}{Passed}\\
+		Choice Statements & Test branch(true) & \textcolor{green}{Passed}\\
+		& Test branch(false) & \textcolor{red}{Failed}\\
+		& Test branch(true)branch(true) & \textcolor{green}{Passed}\\
+		& Test branch(false)branch(true) & \textcolor{green}{Passed}\\
+		Switch Statements & Test case(true) & \textcolor{green}{Passed}\\
+		& Test case(false) & \textcolor{green}{Passed}\\
+		& Test case(true)case(false) & \textcolor{green}{Passed}\\
+		& Test case(false)case(true) & \textcolor{green}{Passed}\\
+		& Test case(true)breakCase(false) & \textcolor{green}{Passed}\\
+		For Statements & Test for array reference, only for\{\} & \textcolor{green}{Passed}\\
+		& Test for array reference, for\{break\}then\{\} & \textcolor{green}{Passed}\\
+		& Test for array reference, for\{noBreak\}then\{\} & \textcolor{green}{Passed}\\
+		& Test for array reference, accessing the parameter values & \textcolor{green}{Passed}\\
+		\bottomrule
+	\end{tabular}
+	\caption{Results of the validation of the individual language elements}
+	\label{tab:ValidationTable}
+\end{table}
+
+\newpage
+%----------------------------------------------------------------------------
+\section{RPN Calculator}
+%----------------------------------------------------------------------------
+
+\begin{lstlisting} [language=tex,caption=The original RPN left-to-right algirithm,label=lst:RPNLeftToRight]
+	for each token in the postfix expression:
+		if token is an operator:
+			operand_2 ← pop from the stack
+			operand_1 ← pop from the stack
+			result ← evaluate token with operand_1 and operand_2
+			push result back onto the stack
+		else if token is an operand:
+			push token onto the stack
+	result ← pop from the stack
+\end{lstlisting}
+
+\bigskip
+\begin{lstlisting} [language=tex,caption=Interfaces of the RPN calculator,label=lst:RPNCalculatorInterfacesSource]
+	package Interfaces
+	
+	interface CalcInput {
+		out event operator (inOperator : Operator)
+		out event operand (inOperand : integer)
+		out event evaluate
+	}
+	
+	interface CalcOutput {
+		out event success (result : integer)
+		out event error
+	}
+	
+	type Operator : enum {
+		addition, subtraction, multiplication, division
+	}
+\end{lstlisting}
+
+\bigskip
+\begin{lstlisting} [language=tex,caption=Model of the RPN calcuator,label=lst:RPNCalculatorModelSource]
+	package Calculator
+	
+	import "Interfaces"
+	
+	statechart CalculatorStatechart[
+			port Input : requires CalcInput
+			port Output : provides CalcOutput
+		]{
+		// Variables
+		var operators : array Operator[2]
+		var numOperators : integer := 0
+		var operands : array integer[2]
+		var numOperands : integer := 0
+		var isOperator : array boolean[4]
+		var numIsOperator : integer := 0	//expression length
+		
+		
+		// Transitions
+		transition from calcEntry to Init
+		
+		transition from Init to OneNumber when Input.operand / {
+			operands[numOperands] := Input.operand::inOperand;
+			isOperator[numIsOperator] := false;
+			numOperands := numOperands + 1;
+			numIsOperator := numIsOperator + 1;
+		}
+		transition from Init to Init when Input.operator / {
+			raise Output.error;
+		}
+		transition from Init to Init when Input.evaluate / {
+			raise Output.error;
+		}
+		
+		transition from OneNumber to Invalid when Input.operand / {
+			operands[numOperands] := Input.operand::inOperand;
+			isOperator[numIsOperator] := false;
+			numOperands := numOperands + 1;
+			numIsOperator := numIsOperator + 1;
+		}
+		transition from OneNumber to Init when Input.operator / {
+			raise Output.error;
+			numOperators := 0;
+			numOperands := 0;
+			numIsOperator := 0;
+		}
+		transition from OneNumber to Init when Input.evaluate / {
+			var oneNumberResult : integer;
+			oneNumberResult := operands[0];
+			raise Output.success(oneNumberResult);
+			numOperands := 0;
+			numIsOperator := 0;
+		}
+		
+		transition from Invalid to Invalid when Input.operand / {
+			operands[numOperands] := Input.operand::inOperand;
+			isOperator[numIsOperator] := false;
+			numOperands := numOperands + 1;
+			numIsOperator := numIsOperator + 1;
+		}
+		transition from Invalid to MaybeValid when Input.operator / {
+			operators[numOperators] := Input.operator::inOperator; 
+			isOperator[numIsOperator] := true;
+			numOperators := numOperators + 1;
+			numIsOperator := numIsOperator + 1;
+		}
+		transition from Invalid to Init when Input.evaluate / {
+			raise Output.error; 
+			numOperators := 0; 
+			numOperands := 0;
+			numIsOperator := 0;
+		}
+		
+		transition from MaybeValid to Invalid when Input.operand / {
+			operands[numOperands] := Input.operand::inOperand;
+			isOperator[numIsOperator] := false;
+			numOperands := numOperands + 1;
+			numIsOperator := numIsOperator + 1;
+		}
+		transition from MaybeValid to MaybeValid when Input.operator / {
+			operators[numOperators] := Input.operator::inOperator; 
+			isOperator[numIsOperator] := true;
+			numOperators := numOperators + 1;
+			numIsOperator := numIsOperator + 1;
+		}
+		transition from MaybeValid to Init when Input.evaluate [numOperators = numOperands - 1] / {
+			var finalResult : integer; 
+			
+			// left-to-right algorithm
+			var resultStack : array integer[2];
+			
+			var stackTop : integer := 0;
+			var operatorsTop : integer := 0;
+			var operandsTop : integer := 0;
+			var isOperatorValue : boolean;
+			
+			//variables in the for loop
+			var temp0 : Operator;
+			var temp1 : integer;
+			var temp2 : integer;
+			var temp : integer;
+			
+			for (i : integer in [0 .. 4]){
+				if (i < (numOperators + numOperands)) {
+					isOperatorValue := isOperator[i];
+					if (isOperatorValue) {
+						// Get values
+						temp0 := operators[operatorsTop]; operatorsTop := operatorsTop + 1;
+						temp1 := resultStack[stackTop]; stackTop := stackTop - 1;
+						temp2 := resultStack[stackTop]; stackTop := stackTop - 1;
+						
+						// Calculate
+						if (temp0 = ::addition) {
+							resultStack[stackTop] := temp1 + temp2; stackTop := stackTop - 1;
+						}
+						else if (temp0 = ::subtraction) {
+							resultStack[stackTop] := temp1 - temp2; stackTop := stackTop - 1;
+						}
+						else if (temp0 = ::multiplication) {
+							resultStack[stackTop] := temp1 * temp2; stackTop := stackTop - 1;
+						}
+						else if (temp0 = ::division) {
+							resultStack[stackTop] := temp1 div temp2; stackTop := stackTop - 1;
+						}
+						
+					}
+					else {
+						temp := operands[operandsTop]; operandsTop := operandsTop + 1;
+						resultStack[stackTop] := temp; stackTop := stackTop + 1;
+					}
+				}
+				else {
+					break;
+				}
+			}
+			
+			//
+			finalResult := resultStack[0];
+			raise Output.success(finalResult);
+			
+			//
+			numOperators := 0;
+			numOperands := 0;
+			numIsOperator := 0;
+		}
+		transition from MaybeValid to Init when Input.evaluate [numOperators /= numOperands - 1] / {
+			raise Output.error; 
+			numOperators := 0; 
+			numOperands := 0;
+			numIsOperator := 0;
+		}
+		
+		// States
+		region mainRegion{
+			initial calcEntry
+			state Init{
+			
+			}
+			state OneNumber{
+			
+			}
+			state Invalid{
+			
+			}
+			state MaybeValid{
+			
+			}
+		}
+	}
+\end{lstlisting}

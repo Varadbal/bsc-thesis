@@ -1,0 +1,1318 @@
+%----------------------------------------------------------------------------
+\chapter{Theoretical Results} \label{chapter_theoreticalResults}
+%----------------------------------------------------------------------------
+%As it has already been stated in the previous chapters, the action language detailed in this chapter should support formal verification methods and have as many high-level control elements and data structures, as possible.
+In this chapter, the various aspects of the proposed action language are detailed. In Section \ref{section_tr_elements} the different elements and their intended semantics along with their syntaxes, in Section \ref{section_tr_validation} the well-formedness constraints in the form of validation rules. In Sections \ref{section_tr_lowlevel}, \ref{section_tr_xsts} and \ref{section_tr_java} the denotational semantics are presented by detailing setps of the transformation of the abstract syntax tree to various other models, namely to the xSTS formalism of the Theta Framework for formal verification and Java code for execution.
+
+As it has already been stated in previous chapters, the language is designed to support formal verification methods by remaining within the boundaries of finite-state machines, but also to have as many high-level control and data structures, as this compromise allows. It extends the type system and expression language of the Gamma Statechart Composition Framework, but it is also extendable by tool-specific elements, which results in a seamless integration.
+
+%----------------------------------------------------------------------------
+\section{Elements of the Action Language} \label{section_tr_elements}
+%----------------------------------------------------------------------------
+Actions - based on Definition \ref{definition_action} - are the fundamental unit of the behavior of the system. Depending on the type of the Action, it may take a set of inputs, produce a set of outputs, or modify the overall state of the system. Actions can be placed in specific places in a statechart: in states as entry or exit actions, or on transitions. They may have side-effects on variables and components that are located in the scope of the Action (data-flow) or influence the execution of other Actions (control-flow). Most actions are Statements, but there are also two special types of Actions: Blocks -- that contain other actions -- and Empty Actions -- that represent no behavior. For an overview of the syntax of the complete action language, see Listing \ref{lst:SCActionLanguageOverview};
+
+The syntax of the language elements is given using the EBNF notation, described in \cite{EBNFStandard}. Examples are given in the resulting language, the (high-level) action language of the Gamma Framework.
+
+%----------------------------------------------------------------------------
+\subsection{Value Declarations}
+Value types are an essential part of imperative programming languages. They pair a name with a data storage location, so the data can be accessed during later phases of the execution using the name. The data must have a predefined type, which is required for its unambigous handling and the pre-runtime discovery of errors. In the language, there are currently two types of values that can be used as Actions: variable declaration statements and constant declaration statements. Another two, parameter declarations and field declarations -- that are only placeholders for actual variables, only possessing a name and a type -- are only accessible from other actions or expressions. For the list of types supported by the language and their semantics, see Table \ref{tab:SCTypes}.
+\begin{table}[ht]
+	\footnotesize
+	\centering
+	\begin{tabular}{ l l }
+		\toprule
+		Type & Meaning \\
+		\midrule
+		integer & integer number \\
+		bounded integer & integer number between predefined boundaries\\
+		boolean & true or false  \\
+		enumeration & user-defined set of values  \\
+		array & list of elements of a predefined type, accessed through a name and an integer-valued index  \\
+		record & a set of values (fields) accessed through a name and a field name hierarchically  \\
+		integer range & a set of integers between predefined boundaries  \\
+		\bottomrule
+	\end{tabular}
+	\caption{The value types supported by the action language}
+	\label{tab:SCTypes}
+\end{table} 
+
+
+\bigskip
+\textbf{Variable Declaration Statements} are Statements that declare and optionally define the variables on which other Actions can operate. Variables must have a name, a type and may have a side-effect free expression for the definition of the variable. They can be read or written and are valid and unique in the scope in which they are declared. They are equivalent to variable declarations used  elsewhere in the Gamma Framework. For the syntax and examples of the usage of variable declaration statements, see Listing \ref{lst:SCVarDeclStatement}.
+\bigskip
+\begin{lstlisting}
+	VariableDeclarationStatement 	= 'var' ID ':' Type [':=' Expression] ';' ;	
+\end{lstlisting}
+\begin{lstlisting} [language=tex,caption=Syntax and examples of variable declaration statements,label=lst:SCVarDeclStatement]
+	var a : integer;
+	---
+	var b : boolean := true;
+	---
+	var c : array integer[3];
+\end{lstlisting}
+
+\textbf{Constant Declaration Statements} are Statements that declare and define read-only values, that can be used by other Actions. Constants possess a name, a type and a mandatory side-effect free expression for the definition of the constant. They are valid and unique in the scope in which they are declared. They are equivalent to constant declarations used  elsewhere in the Gamma Framework. For the syntax and examples of the usage of constant declaration statements, see Listing \ref{lst:SCConstDeclStatement}.
+\bigskip
+\begin{lstlisting}
+	ConstantDeclarationStatement 	= 'const' ID ':' Type := Expression ';' ;
+\end{lstlisting}
+\begin{lstlisting} [language=tex,caption=Syntax and examples of constant declaration statements,label=lst:SCConstDeclStatement]
+	const a : integer := 5;
+	---
+	const b : array integer[2] := []{1, 2}; 
+\end{lstlisting}
+
+\textbf{Parameter Declarations} declare read-only values as parts of various other actions (i.e. they are placeholders for constants, possessing a name and a type). They are not independent elements of the action language, as the semantics of the value taken by the parameter depends on the containing action. For an example of the usage of parameters, see Listing \ref{lst:SCForStatement}. 
+
+\bigskip
+Due to only specifying properties of identifiers (language entity namings), value declarations themselves do not have any effect on the formal verifiability of the correct behavior of the system. However, the values held by these declarations can be problematic, as unbounded integers or real numbers coming from the outside world may be impossible to verify. This problem is delegated to the tool performing the formal verification: a feasible way of tackling this problem may be through applying abstractions.
+%----------------------------------------------------------------------------
+\subsection{Expressions}
+Expressions combine values (or references to values), operators, and functions, and can be evaluated to a single value of a certain type. They may have side-effects (i.e. change the state of the system, like function access expressions), that justifies their applicability as Actions. Expressions can be evaluated to an empty expression having the \textit{void} type, which cannot be used in other expressions. The applicable expression language is that of the Gamma Framework.
+
+\textbf{Reference Expressions} are expressions that refer to (elements of) value declarations or procedure declarations. Generally, they can be used as parts of assignment statements or expression statements. Apart from 'simple' references to value declarations, there are four access expressions, which are specialized references:
+\begin{itemize}
+	\item record access expression: used to access fields (elements) of a record through the name of the record and the name of the fields.
+	\item array access expression: used to access elements or an array through the name of the array and an integer-type expression for the index of the element.
+	\item function access expression: used to access a function (lambda or procedure). This expression may have side effects and cannot be assigned.
+	\item select expression: used to non-deterministically access an element of an array, enumeration or integer range. This expression cannot be assigned.
+\end{itemize}
+\begin{lstlisting} [language=tex,caption=Examples of reference expressions,label=lst:SCReferenceExpression]
+	//var arr : array integer[2] := []{1, 2};
+	//var a : integer; 
+	a := arr[1];
+	---
+	//proc() is defined somewhere
+	//var b : boolean 
+	b := proc();
+\end{lstlisting}
+
+\textbf{Value Initializer Expressions} are expressions as part of variable and constant delcarations. They cannot contain expressions with a side-effect, as they can also be used outside of actions -- i.e. to define global variables in or even outside of a statechart. For examples of the usage of value initializer expressions, see Listing \ref{lst:SCVarInitExpression}.
+\bigskip
+\begin{lstlisting} [language=tex,caption=Examples of variable initializer expressions,label=lst:SCVarInitExpression]
+	var a : integer := 5;	//5 is an integer literal expression
+	---
+	var b : integer := a;	//a is a reference expression		
+\end{lstlisting}
+
+\textbf{Expression Statements} are Statements that contain expressions. For the syntax and examples of the usage of expression statements, see Listing \ref{lst:SCExpressionStatement}.
+\bigskip
+\begin{lstlisting}
+	ExpressionStatement 			= Expression ';' ;		//based on the expression language of Gamma
+\end{lstlisting}
+\begin{lstlisting} [language=tex,caption=Syntax and examples of reference expressions,label=lst:SCExpressionStatement]
+	1;							//integer literal expression
+	---
+	true;						//boolean literal expression
+	---
+	-1;							//unary minus expression
+	---
+	[]{1, 2, 3}			//array literal expression
+	---
+	1 + 1;					//addition expression
+	---
+	5 div 2;				//integer division expression
+	---
+	1 < 2;					//less expression
+	---
+	true = true;		//equality expression
+	---
+	(1 + 1) * 2;		//primary expression ( ... )
+	---
+	//var a : integer
+	a;							//reference expression
+	---
+	myArray[2];			//array access expression
+	---
+	myFunction(1, true);	//function access expression
+	---
+	rec.fa;					//record access expression				
+\end{lstlisting}
+
+\bigskip
+The evaluation of a side-effect free expression over the permitted value types can be carried out in a finite number of steps and does not alter the state of the system, thus it does not have an effect on formal verifiability. There is currently one expression in the langue, which can produce side effects, namely the function access expression. Functions associate a name with an expression (side-effect free) or an action -- in the latter case the formal verifiability depends on the formal verifiability of procedure declarations.
+%----------------------------------------------------------------------------
+\subsection{State Modification Actions}
+State modifying actions are also fundamental entities in imperative programming, as these actions describe the possible changes of the system components over time. These actions may modify different kinds of (inner) variables, or stimulate other systems or system components through events.
+
+\bigskip
+\textbf{Assignment Statements} are statements that enable the assignment of values to variables. The left-hand side of the assignment is a reference expression (referring to a variable declaration) and the right-hand side is an expression. After the assignment, the value of the variable referred on the left-hand side takes the evaluated value of the right-hand side expression. For the syntax and examples of the usage of assginment statements, see Listing \ref{lst:SCAssignmentStatement}.
+
+As an assignment statement only changes the state of one variable, which can be carried out in one step, the possibility of formal verification is not hindered by assignment statements.
+\bigskip
+\begin{lstlisting}
+AssignmentStatement 			= AssignableExpression ':=' Expression ';' ;
+AssignableExpression 			= ReferenceExpression | ArrayAccessExpression | RecordAccessExpression ;
+\end{lstlisting}
+\begin{lstlisting} [language=tex,caption=Syntax and examples of assignment statements,label=lst:SCAssignmentStatement]
+//var myInt : integer;
+myInt := -1;
+---
+//var myArr : array integer[2];
+myArr := []{1, 2};
+myArr[1] := 3;
+---
+//var myRec : record{field1 : integer, field2 : boolean} := (# field1 := 3, field2 := false #);
+//procedure proc() : integer { return 4; }
+myRec.field1 := proc();
+\end{lstlisting}
+
+\bigskip
+\textbf{Raise Event Actions} are actions of the Gamma Framework, that extend the action language by enabling the raising of predefined events. Events are also constructs of the Gamma Framework, that, when raised, are sent through the specified port to the component that contains the port on the other end of the channel. Events can also have parameters, thus it is possible to send values to other components. For the syntax and examples of the usage of raise event actions, see Listing \ref{lst:SCRaiseEventAction}.
+
+As a raise event action only changes the state of one channel, which can be carried out in a finite number of steps, the possibility of formal verification is not hindered by raising events.
+\bigskip
+\begin{lstlisting}
+	RaiseEventAction 		= 'raise' Port '.' Event '(' [Expression {',' Expression}] ')'  ;	
+\end{lstlisting}
+\begin{lstlisting} [language=tex,caption=Syntax and examples of raise event actions,label=lst:SCRaiseEventAction]
+	//Toggle is a provided interface with the out event toggle
+	raise Toggle.toggle;
+	---
+	//Operator is a provided interface with the out event add(p : integer)
+	raise Operator.add(5);
+\end{lstlisting}
+
+\textbf{Set Timeout Actions} are actions of the Gamma Framework, that extend the action language with setting timeouts of the Gamma Framework to a provided value given in seconds or milliseconds. An internal timeout event is produced at the end of the specified time interval. For the syntax and examples of the usage of set timeout actions, see Listing \ref{lst:SCSetTimeOutAction}.
+
+As a set timeout action only changes the state of one timeout, which can be carried out in one step, the possibility of formal verification is not hindered by set timeout actions.
+\bigskip
+\begin{lstlisting}
+	SetTimeoutAction 			= 'set' TimeoutDeclaration ':=' TimeSpecification ;	
+	TimeSpecification 		= AdditiveExpression TimeUnit
+	TimeUnit 							= 's' | 'ms'
+\end{lstlisting}
+\begin{lstlisting} [language=tex,caption=Syntax and examples of set timeout actions,label=lst:SCSetTimeOutAction]
+	//timeout timeOut
+	set timeOut := 5 s;
+	---
+	//timeout timeOut
+	//var offset : integer := 500
+	set timeOut := (100 + offset) ms;
+\end{lstlisting}
+
+\textbf{Deactivate Timeout Actions} extend the action language with deactivating timeouts of the Gamma Framework. A deactivated timeout does not produce timeouts. For the syntax and examples of the usage of deactivate timeout actions, see Listing \ref{lst:SCDeactivateTimeoutAction}.
+
+As a deactivate timeout action only changes the state of one timeout, which can be carried out in one step, the possibility of formal verification is not hindered by deactivate timeout actions.
+\bigskip
+\begin{lstlisting}
+	DeactivateTimeoutAction 	= 'deactivate' TimeoutDeclaration ;
+\end{lstlisting}
+\begin{lstlisting} [language=tex,caption=Syntax and examples of deactivate timeout actions,label=lst:SCDeactivateTimeoutAction]
+	//timeout timeOut
+	deactivate timeOut;
+\end{lstlisting}
+
+%----------------------------------------------------------------------------
+\subsection{Control Flow Statements}
+Control flow statements explicitly define the order of execution for other actions. The chosen order of execution may depend on the overall state of the system (i.e. values), expressions, or other control flow statements.
+
+\bigskip
+\textbf{Blocks} are actions that define sequential execution for the contained actions and also limit the scope of other actions. They may contain or be contained in other actions (e.g. variable declarations). For the syntax and examples of the usage of blocks, see Listing \ref{lst:SCBlock}.
+
+Formal verification of the behavior contained in a block is possible when it is possible for each of the contained actions -- which is detailed at the individual actions.
+\bigskip
+\begin{lstlisting}
+	Block 			= '{' {Action} '}' ;
+\end{lstlisting}
+\begin{lstlisting} [language=tex,caption=Syntax and examples of blocks,label=lst:SCBlock]
+	{
+		. . . 
+	}
+	---
+	if(true) {
+		. . .
+	}
+\end{lstlisting}
+
+\bigskip
+\textbf{If Statements} are conditional statements that define blocks of actions that are executed when the guard expression of the block is evaluated to true. There can be an arbitrary number of guarded blocks, but at most one of them is executed. In case multiple guards are evaluated to true, the earlier defined one is chosen. There is also a possibility to define a block to execute when none of the other blocks is chosen, called an \textit{else-block}. For the syntax and examples of the usage of if statements, see Listing \ref{lst:SCIfStatement}.
+
+The formal verification of the if statement is possible, if it is possible for all the contained actions, as \textit{the guard expressions must always be side-effect free expressions}.
+\bigskip
+\begin{lstlisting}
+	IfStatement 		= 'if' '(' Expression ')' Action
+		{'elsif' '(' Expression ')' Action}
+		['else' Action]
+	;
+\end{lstlisting}
+\begin{lstlisting} [language=tex,caption=Syntax and examples of if statements,label=lst:SCIfStatement]
+	if (a /= b) {
+		. . .
+	}
+	---
+	if (a < b) {
+		. . .
+	} elsif (a > b) {
+		. . .
+	} else {
+		. . .
+	}
+\end{lstlisting}
+
+\bigskip
+\textbf{Choice Statements} are statements that define blocks of actions that are executed when the guard of the block is evaluated to true. There can be an arbitrary number of guarded blocks, but at most one of them is executed. In case multiple guards are evaluated to true, one block is chosen \textit{non-deterministically}. For the syntax and examples of the usage of choice statements, see Listing \ref{lst:SCChoiceStatement}.
+
+The formal verification of the choice statement is possible, if it is possible for all the contained actions, as \textit{the guard expressions must always be side-effect free expressions}. It is worth to note that this element may introduce non-deterministic behavior, which causes branching in the state-space.
+\bigskip
+\begin{lstlisting}
+	ChoiceStatement 		= 'choice' '{'
+		'branch' '[' Expression ']' Action
+		{'branch' '[' Expression ']' Action}
+		'}'	
+	;
+\end{lstlisting}
+\begin{lstlisting} [language=tex,caption=Syntax and examples of choice statements,label=lst:SCChoiceStatement]
+choice {
+	branch [a < 1] {
+		. . .
+	}
+	branch [a < 2] {
+		. . .
+	}
+	branch [true] {
+		. . .
+	}
+}
+\end{lstlisting}
+
+\bigskip
+\textbf{Break Statements} are statements that can be contained in \textit{switch statements} and \textit{for statements}, the resulting behavior depending on the type of the containing statement, in general interrupting the execution of the containing statement. For the syntax of break statements, see Listing \ref{lst:SCBreakStatement}. For examples of their usage, see Listings \ref{lst:SCSwitchStatement} and \ref{lst:SCForStatement}.
+
+As break statements never increase the number of actions to be executed and do not change the state of the system in any way, they do not have an effect on the feasibility of the formal verification of the system.
+\bigskip
+\begin{lstlisting} [language=tex,caption=Syntax of break statements,label=lst:SCBreakStatement]
+	BreakStatement 			= 'break' ';';
+\end{lstlisting}
+%\begin{lstlisting} [language=tex,caption=Syntax and examples of break statements,label=lst:SCBreakStatement]
+%	for (a : integer in [0 .. 100]) {
+%		. . .
+%		if (true)
+%			break;
+%	}
+%	---
+%	switch (true) {
+%		case true : {
+%			. . .
+%			break;
+%		}
+%		default: {
+%			. . .
+%		}
+%	}
+%\end{lstlisting}
+
+\bigskip
+\textbf{Return Statements} define the return values of \textit{Procedures}, also interrupting their execution when encountered. For the syntax of return statements, see Listing \ref{lst:SCReturnStatement}. For examples of their usage, see Listing \ref{lst:SCFunctionDeclaration}.
+
+As return statements affect at most one value assignment, they do not have an effect on the feasibility of the formal verification of the system.
+\bigskip
+\begin{lstlisting} [language=tex,caption=Syntax of return statements,label=lst:SCReturnStatement]
+	ReturnStatement 			= 'return' Expression ';' ;
+\end{lstlisting}
+%\begin{lstlisting} [language=tex,caption=Syntax and examples of return statements,label=lst:SCReturnStatement]
+%	procedure proc() : void {
+%		return;
+%	}
+%	---
+%	procedure proc2() : integer{
+%		for(a : integer in [0 .. 100]){
+%			if(a = 55)
+%				return a;
+%		}
+%	}
+%\end{lstlisting}
+
+\bigskip
+\textbf{Switch Statements} are statements that define blocks of actions that are executed when the evaluation of the guard expression of the given or a previous block equals the evaluation of the control expression defined at the beginning of the statement. There can be an arbitrary number of guarded blocks, and the execution starts at the first block where the previously defined condition is met. The execution stops when a \textit{break statement} is encountered. This means, that the language supports \textit{fallthrough} switch statements. There is also a possibility to define a block whose guard is always evaluated to true, called a \textit{default-block}, which must be the last of the blocks of the statement. For the syntax and examples of the usage of switch statements, see Listing \ref{lst:SCSwitchStatement}.
+
+The formal verification of the switch statement is possible, if it is possible for all the contained actions, as \textit{the guard expressions and the control expression must always be side-effect free expressions}.
+\bigskip
+\begin{lstlisting}
+	SwitchStatement 		= 'switch' '(' Expression ')' '{'
+			'case' Expression ':' Action
+			{'case'  Expression ':' Action}
+			['default' ':' Action]
+		'}'	
+	;
+\end{lstlisting}
+\begin{lstlisting} [language=tex,caption=Syntax and examples of switch statements,label=lst:SCSwitchStatement]
+	switch (a) {
+		case b : {		
+			. . .
+		}
+		case c : {		
+			. . .
+			break;
+		}
+		case d : break;	
+		deafult: {		
+			. . .
+		}
+	}
+\end{lstlisting}
+
+\bigskip
+\textbf{For Statements} are statements that define a \textit{parameter variable} and a \textit{body} (an action), and take a \textit{range expression} that can be evaluated to a value of a composite, enumerable type (i.e. containing multiple values). The action is executed for each value contained in the range expression \textit{sequentially}, with the parameter variable taking the corresponding value each time. The execution of the statement can be interrupted by a \textit{break statement}. The for statement also has an action called the \textit{then-action}, which is executed, if the execution of the for statement was not interrupted by break statements. For the syntax and examples of the usage of for statements, see Listing \ref{lst:SCForStatement}.
+
+For statements are useful for the iterative solution of several well-known programming problems -- such as raising a number to its powers or approximating logarithms --, as well as for the compact description of the same behavior taking different input parameters -- like checking or behaving based on a series of previously saved inputs.
+Due to a range expression -- of a previously known, fixed size -- always being required at the definition of a for statement, the number of iterations is always known in advance. This prevents infinite loops, which would in turn make the termination of the program undecidable. Another factor we must consider is verifiability of the body and then-actions, which is discussed at the individual actions.
+
+The range expression is either an array literal expression, an integer literal expression, a reference to an array or integer range typed variable or a reference to an enumeration type definition. Due to the syntax and well-formedness constraints of these elements, these constructs always contain a finite set of elements, as either the elements or the size must be explicitly given by the designer of the system. 
+
+'Standard' for-loops of other imperative programming languages are not included in the language, as the iteration until an unbounded variable fulfilling certain criteria would result in possibly infinite loops thus livelocks, and also undecidability of the halting problem. However, through the inclusion of the integer range type into the action language, the behavior of these for-loops can be simulated in many cases, as often for loops have their parameter variable starting at a given value and increasing by steps of 1 until another given value. In case the for statement contains calculation boundaries resulting from the finiteness of the range variable, this can be signaled using the then-action (as in one of the examples of Listing \ref{lst:SCForStatement}).
+
+\bigskip
+\begin{lstlisting}
+	ForStatement 		= 	'for' '(' ParameterDeclaration ':' Expression ')'
+			Action
+		'then'
+			Action
+	;
+	ParameterDeclaration = ID ':' Type ;	
+\end{lstlisting}
+\begin{lstlisting} [language=tex,caption=Syntax and examples of for statements,label=lst:SCForStatement]
+	//var myArr : array integer[3] := []{1, 2, 3};
+	for (p : myArr) {
+		. . .
+	}
+	---
+	//Calculating a certain power of 'num' up to the 20th
+	//var num : integer := 10;
+	//var pow : integer := . . .;
+	//var res : integer := 1;
+	for (p : [1 .. 21]) {
+		res := res * num;
+		if(p >= pow)
+			break;
+	} then {
+		raise Events.error;	//assuming the Events.error event exists
+	}
+\end{lstlisting} 
+
+\bigskip
+\textbf{Assertion Statements} are statements that offer monitoring capabilities at runtime. They contain a boolean-type expression, which, when evaluated to false, makes the assertion fail. On a failed assertion, the system stops operating. For the syntax and examples of the usage of assertion statements, see Listing \ref{lst:SCAssertionStatement}.
+
+Assertions are useful for setting requirements in addition to the trigger and guard of the transition. As they can occur anywhere in an action, more complex computations are possible for the requirement, than in the guard of the transition. They can also be used for monitoring the state of the system at runtime.
+
+Due to assertions never increasing the number of actions to be executed and possibly causing the system to terminate, they do not have a negative effect on the feasibility of formal verification of the system. 
+
+\bigskip
+\begin{lstlisting}
+	AssertionStatement		= 	'assert' '(' Expression ')' ';' ;
+\end{lstlisting}
+\begin{lstlisting} [language=tex,caption=Syntax and example of assertion statements,label=lst:SCAssertionStatement]
+	{
+		//var pos : integer
+		//pos := ... complex expression here ...
+		assert(pos > 0);
+	}
+\end{lstlisting} 
+
+%----------------------------------------------------------------------------
+\subsection{Other Elements}
+
+\textbf{Empty Statements} are special statements that do not represent any behavior. They can be used where actions are required, but there is no intended behavior. Empty statements do not have a textual representation and do not change properties of the action language (such as termination, syntax, etc.) in any way.
+
+\bigskip
+\textbf{Procedure Declarations} are language elements that define a reusable block of actions, which is executed at the corresponding \textit{function access expressions}. They are not actions themselves, but contain an arbitrary number of actions through a block. For the syntax and examples of the usage of procedure declarations, see Listing \ref{lst:SCFunctionDeclaration}.
+
+Procedures (and functions in general) are useful, as they reduce the redundancy of the code, thus eliminating possible design flaws resulting from having to change the it in multiple places. Apart from their parameters, procedures of the language are independent from their context, which allows for inlining at the place of the access. This improves the verifiability by handling the code contained in the procedure together with its context, thus enabling further optimization.
+
+An important factor to consider in connection with procedures, is the problem of recursion. If it is possible for a procedure to access itself and the return statement (or the end of the procedure) is never reached, the situation leads to a livelock -- or assuming finite memory, some kind of non-deterministic memory overflow. Naturally, this leads to the impossibility of formal verification, thus it must be limited in some way. The current policy is to define the maximum recursion depth somewhere in the scope of the procedure declaration -- the exact place depending on the target framework (the Gamma Framework).
+
+As procedure declarations only consist of parameter declarations, a return value and a block of actions -- also, the problem of recursion is resolved by limiting the execution of the elements to a previously known finite number -- the feasibility of formal verification depends on the actions contained in the block -- which is discussed at the individual actions.
+
+\bigskip
+\begin{lstlisting}
+	FunctionDeclaration 		= LambdaDeclaration | ProcedureDeclaration ;
+	LambdaDeclaration 			= 'lambda' ID '(' [ParameterDeclaration {',' ParameterDeclaration}] ')' 
+		':' Type ':=' [Expression] ;
+	ProcedureDeclaration		= 'procedure' ID '(' [ParameterDeclaration {',' ParameterDeclaration}] ')' 
+		':' Type Block ;
+\end{lstlisting}
+\begin{lstlisting} [language=tex,caption=Syntax and examples of function declarations,label=lst:SCFunctionDeclaration]
+	procedure myProc() : void {
+		. . .
+	}
+	---
+	procedure myProc2(a : integer, b : boolean) : integer {
+		. . .
+		return a + 5;
+	}
+\end{lstlisting}
+
+%----------------------------------------------------------------------------
+\section{Validation} \label{section_tr_validation}
+%----------------------------------------------------------------------------
+Validation rules enforce the well-formedness constraints of the modeling language in the actual development environment. Some of these only warn the user of potential design flaws -- so they can be discovered as early in the design phase, as possible -- while others mark unintentionally non-deterministic or faulty behavior or an untransformable combination of Actions in the form of errors.
+
+The exhaustive list of these validation rules is very long and consist of mostly intuitive elements. For this reason, most rules described here are only summarizing some aspects to be considered with respect to the corresponding priority (warning or error) instead of providing precise definitions of all the individual rules based on the metamodels of the language.
+ 
+\subsection{Warnings}
+\begin{itemize}
+	\item \textbf{Value Declarations:}
+	\begin{itemize}
+		\item unused value declaration (variable, constant or parameter): it may cause overhead, although not resulting in undefined behavior
+	\end{itemize}
+	\item \textbf{Expressions:}
+	\begin{itemize}
+		\item side effect-free expression statement: it may cause overhead, although not resulting in undefined behavior
+	\end{itemize}
+	\item \textbf{State Modification Actions:}
+	\begin{itemize}
+		\item assignment of a variable to itself: it may cause overhead, although not resulting in undefined behavior
+	\end{itemize}
+	\item \textbf{Control Flow Actions:}
+	\begin{itemize}
+		\item empty block: it may cause overhead, although not resulting in undefined behavior
+	\end{itemize}
+	\item \textbf{Other Elements:}
+	\begin{itemize}
+		\item procedure only used once: it may cause overhead, although not resulting in undefined behavior
+	\end{itemize}
+\end{itemize}
+
+\subsection{Errors}
+\begin{itemize}
+	\item \textbf{Value Declarations:}
+	\begin{itemize}
+		\item constant declaration without initializing expression: it results in no value to be read
+		\item value declaration with different initializing expression type from the declaration type: type casting is not permitted in the language
+		\item void-type value: it makes no sense, as it cannot store anything
+	\end{itemize}
+	\item \textbf{Expressions:}
+	\begin{itemize}
+		\item invalid expressions (according to the constraints of the expression language)
+		\item initializing expressions having side effects: the execution would require actions, which may not be allowed in the given context
+		\item access expressions having invalid arguments (e.g. type, name, number of arguments): elements can only be accessed based on valid arguments
+	\end{itemize}
+	\item \textbf{State Modification Actions:}
+	\begin{itemize}
+		\item assignment to constant or parameter: by definition of these elements not allowed
+		\item assignment of different types: type casting is not permitted in the language
+		\item assignment of undefined values: it would result in an undefined behavior
+	\end{itemize}
+	\item \textbf{Control Flow Actions:}
+	\begin{itemize}
+		\item if, choice, switch statement guards (and control expressions) having side-effects: the state modifications should happen in the actions
+		\item return or break statements outside of any elements providing valid context for them: it would result in undefined behavior
+	\end{itemize}
+	\item \textbf{Other Elements:}
+	\begin{itemize}
+		\item procedure with different return statement types from each other and the type of the procedure itself: type casting is not permitted in the language
+	\end{itemize}
+\end{itemize}
+
+%----------------------------------------------------------------------------
+\section{Low-level model} \label{section_tr_lowlevel}
+%----------------------------------------------------------------------------
+In order to transform our high-level models -- that are easy to understand, handle and explain, with several language elements and their complex relations -- into various other (often formal) models, it is useful to transform them into one with only a few different types of elements and many basic relations. For statecharts -- like those of the Gamma Framework introduced in \ref{section_background_target} --, this means substituting syntactic elements with ones resembling those of a finite-state machine: several transitions instead of hierarchical states or the product of the states of concurrent regions. These few simple constructs are then easily transformable into elements of other modeling languages.
+
+For action languages, this means reducing the number of available actions, as well as expressions and types, by transforming the composite elements into constructs using only basic ones. Naturally, it is neither sensible nor possible to reduce the number of applicable elements indefinitely, but finding the elements resembling those of most other formalisms simplifies the further transformations greatly. 
+
+In the rest of the section, these high-level-to-low-level transformations of the language elements are examined. For the overview of the high-level-to-low-level transformations, see Table \ref{tab:SCLLOverview}. The example codes for each of the transformations are given through the Gamma Action Language syntax for the high-level statechart elements and the same syntax for the low-level statechart elements.
+
+%----------------------------------------------------------------------------
+\subsection{Value Declarations}
+The various value declarations of the high-level statechart model are transformed into variable declarations of the low-level model. The names and initializing expressions are easily transformable, the transformation of the types, however, is not so simple. The array and record types -- the complex types -- arise from the composition of other, 'simple' types for more compact and often more intuitive handling. These types are broken up into their componenets, producing multiple declarations instead of the original one. For the list of type mappings, see Table \ref{tab:SCLLTypeMapping}.	
+
+\begin{table}[ht]
+	\footnotesize
+	\centering
+	\begin{tabular}{ l l }
+		\toprule
+		High-level & Low-level \\
+		\midrule
+		integer & integer \\
+		bounded integer & bounded integer \\
+		boolean & boolean  \\
+		enumeration & enumeration  \\
+		array & n $\times$ element type (also transformed)  \\
+		record & the consituting types  \\
+		integer range & n $\times$ integer  \\
+		\bottomrule
+	\end{tabular}
+	\caption{The high-level-to-low-level type mappings}
+	\label{tab:SCLLTypeMapping}
+\end{table}
+
+\bigskip
+\textbf{Variable Declaration Statements} are transformed into one or more variable declaration statements, depending on the type of the original variable.
+
+\begin{table}[ht]
+	\footnotesize
+	\centering
+	\begin{tabular}{ p{7cm} p{7cm} }
+		\toprule
+		High-level & Low-level \\
+		\midrule
+		\begin{lstlisting}
+		var a : integer;\end{lstlisting} & 
+		\begin{lstlisting}
+		var a : integer;\end{lstlisting} \\
+		\begin{lstlisting}
+		var b : array boolean[3]  
+						:= []{true, true, false};
+				
+					\end{lstlisting} & 
+		\begin{lstlisting}
+		var __array_b_0 : boolean := true;
+		var __array_b_1 : boolean := true;
+		var __array_b_2 : boolean := false;
+		\end{lstlisting} \\
+		\bottomrule
+		\multicolumn{2}{l}{NOTE: the names of low-level variables are automatically generated and may be different}
+	\end{tabular}
+	\caption{Examples of variable declaration statement transformations}
+	\label{tab:SCLLVariableDeclarationExample}
+\end{table}
+
+\bigskip
+\textbf{Constant Declaration Statements} are transformed into one or more variable declaration statements, depending on the type of the original constant.
+
+\begin{table}[ht]
+	\footnotesize
+	\centering
+	\begin{tabular}{ p{7cm} p{7cm} }
+		\toprule
+		High-level & Low-level \\
+		\midrule
+		\begin{lstlisting}
+		const a : boolean;\end{lstlisting} & 
+		\begin{lstlisting}
+		var a : boolean;\end{lstlisting} \\
+		\begin{lstlisting}
+		const b : record{ f1 : boolean, f2 
+			: integer} := (# f1 := true, f2 := -1#)	
+		\end{lstlisting} & 
+		\begin{lstlisting}
+		var __record_b_f1 : boolean := true;
+		var __record_b_f2 : integer := true;
+		\end{lstlisting} \\
+		\bottomrule
+		\multicolumn{2}{l}{NOTE: the names of low-level variables are automatically generated and may be different}
+	\end{tabular}
+	\caption{Examples of constant declaration statement transformations}
+	\label{tab:SCLLConstantDeclarationExample}
+\end{table}
+
+\bigskip
+\textbf{Parameter Declarations} are transformed into one or more variable declaration statements and one or more assignment statements, depending on the type and context of the original parameter. As they are not independent elements of the action language, the exact place and value assignment of the variable depends on the language construct the parameter was contained in, e.g. for statement or procedure declaration.
+
+\begin{table}[ht]
+	\footnotesize
+	\centering
+	\begin{tabular}{ p{7cm} p{7cm} }
+		\toprule
+		High-level & Low-level \\
+		\midrule
+		\begin{lstlisting}
+		for (p : integer in ExampleArray) {
+			. . .
+		}\end{lstlisting} & 
+		\begin{lstlisting}
+		var p : integer;
+		p := . . .
+		. . .\end{lstlisting} \\
+		\bottomrule
+		\multicolumn{2}{l}{NOTE: the names of low-level variables are automatically generated and may be different}
+	\end{tabular}
+	\caption{Examples of parameter declaration transformations}
+	\label{tab:SCLLParameterDeclarationExample}
+\end{table}
+
+%----------------------------------------------------------------------------
+\subsection{Expressions}
+The result of the high-level-to-low-level transformation in case of expressions depends on the type and context of expressions. The unnecessary expressions -- that do not affect the semantics of the model -- are removed, the others are retained as parts of actions or are completely transformed into actions. Reference expressions are replaced with reference expressions referring to the corresponding variables of the low-level model.
+
+\bigskip
+\textbf{Expression Statements} are either replaced with empty actions (if they are side-effect free), or become a series of actions, like procedure declarations. Procedure declarations are inlined with the constraints of the inlining discussed in \ref{section_tr_elements}.
+
+\begin{table}[ht]
+	\footnotesize
+	\centering
+	\begin{tabular}{ p{7cm} p{7cm} }
+		\toprule
+		High-level & Low-level \\
+		\midrule
+		\begin{lstlisting}
+		5 + 4;\end{lstlisting} & 
+		\begin{lstlisting}
+		//Empty action, as the value is not used\end{lstlisting} \\
+		\begin{lstlisting}
+		//procedure declared somewhere
+		proc();
+		
+		\end{lstlisting} & 
+		\begin{lstlisting}
+		var __ret_proc : integer; //if not void
+		{
+			. . .	//maybe raise event, etc.
+		}\end{lstlisting} \\
+		\bottomrule
+		\multicolumn{2}{l}{NOTE: the names of low-level variables are automatically generated and may be different}
+	\end{tabular}
+	\caption{Examples of expression statement transformations}
+	\label{tab:SCLLExpressionStatementExample}
+\end{table}
+
+\bigskip
+\textbf{Reference expressions} are transformed based on the type of the value they refer to (and possibly access the values of) and the action they are used in. Generally, the resulting models declare a variable before the rest of the containing action, assign this variable some value, then replace the corresponding part of the action with a reference to this variable. In case of 'simple' reference expressions, the high-level reference can simply be replaced, as this intermediate assignment can be omitted.
+\begin{itemize}
+	\item In case of \textbf{array access expressions}, the variable is assigned based on the runtime evaluation of the argument expression, within the boundaries of the defined array.
+	\item In case of \textbf{function access expressions}, the function is inlined before the assignment and the return variable of the function is assigned. The details and difficulties of this inlining are discussed in Section \ref{section_tr_elements} at the procedure declarations.
+	\item In case of \textbf{record access expressions} the generated variable can be directly assigned, as the name of the accessed record and field is known at compile time (at the time of the model generation).
+	\item In case of \textbf{select expressions}, the capabilities of choice statements are utilized for non-deterministic value assignment.
+\end{itemize}
+
+\bigskip
+\textbf{Value Initializer Expressions} can be copied into the low-level model, as action language-specific expressions are not allowed.
+
+%----------------------------------------------------------------------------
+\subsection{State Modification Actions}
+State modification actions are transformed into assignment statements, as the different aspects of the overall state of the system are stored in variables.
+
+\bigskip
+\textbf{Assignment Statements} are transformed into assignment statements of the low-level model. The expressions on the left and righ-hand sides of the assignment are transformed according to the transformation rules of expressions.
+
+\begin{table}[ht]
+	\footnotesize
+	\centering
+	\begin{tabular}{ p{7cm} p{7cm} }
+		\toprule
+		High-level & Low-level \\
+		\midrule
+		\begin{lstlisting}
+		//variable 'a' is valid
+		a := 3;\end{lstlisting} & 
+		\begin{lstlisting}
+		//transformation of variable 'a' exists
+		a := 3;\end{lstlisting} \\
+		\begin{lstlisting}
+		//variables 'a' and 'myRec' are valid
+		a := myRec.f1;
+		
+		
+		\end{lstlisting} & 
+		\begin{lstlisting}
+		//transformations of the variables exist
+		var __rhs_val : integer;
+		__rhs_val := __record_myRec_f1;
+		a := __rhs_val;
+		\end{lstlisting} \\
+		\bottomrule
+		\multicolumn{2}{l}{NOTE: the names of low-level variables are automatically generated and may be different}
+	\end{tabular}
+	\caption{Examples of assignment statement transformations}
+	\label{tab:SCLLAssignmentStatementExample}
+\end{table}
+
+\bigskip
+\textbf{Raise Event Actions} are transformed into one or more assignment statements. In case of unparametrized events, it is enough to assign the corresponding \textit{isRaised-flag}, but for parametrized events, each of the parameters must be assigned, if the corresponding arguments exist.
+
+\begin{table}[ht]
+	\footnotesize
+	\centering
+	\begin{tabular}{ p{7cm} p{7cm} }
+		\toprule
+		High-level & Low-level \\
+		\midrule
+		\begin{lstlisting}
+		//event 'Out.out' is valid
+		raise Out.out;\end{lstlisting} & 
+		\begin{lstlisting}
+		//event is transformed
+		isRaised := true; //out.isRaised variable\end{lstlisting} \\
+		\bottomrule
+		\multicolumn{2}{l}{NOTE: the names of low-level variables are automatically generated and may be different}
+	\end{tabular}
+	\caption{Examples of raise event action transformations}
+	\label{tab:SCLLRaiseEventActionExample}
+\end{table}
+
+\bigskip
+\textbf{Set Timeout Actions} are transformed into an assignment statement. The left-hand side of this assignment is the low-level timeout variable (corresponding to the high-level timeout declaration) and the right-hand side is an integer literal, setting the timeout variable to 0 -- which is then supposed to count from 0 to infinity (in practice up to the given time).
+
+\bigskip
+\textbf{Decativate Timeout Actions} -- being Gamma Framework-specific actions -- require further consideration and are not yet transformed.
+
+%----------------------------------------------------------------------------
+\subsection{Control Flow Actions}
+Control flow actions are transformed into either blocks (if they represent sequential execution), if or choice statements (if they represent choice between executions, depending on the fact if they represent deterministic choice or not), or are removed from the resulting model, but influence the contents of other elements. 
+
+\bigskip
+\textbf{Blocks} are transformed Blocks of the low-level models. Each of the contained actions of the original block is transformed and placed in the block resulting from the transformation.
+
+\bigskip
+\textbf{If Statements} are transformed into if statements. The guards are extracted into separate boolean-valued variables (thus supporting the resolution of access expressions), which then replace the original guards. The branches of the if statement contain the transformed images of the original actions. 
+
+To be able to support the transformation of for statements, switch statements and procedure declarations -- that can have break and return statements as elements --, the actions after the statement are placed in each of the branches and an else branch is also defined in case there is none.
+
+\begin{table}[ht]
+	\footnotesize
+	\centering
+	\begin{tabular}{ p{7cm} p{7cm} }
+		\toprule
+		High-level & Low-level \\
+		\midrule
+		\begin{lstlisting}
+		//events are declared
+		//G1 is a boolean-type expression
+		if (G1) {
+			raise B;
+		}
+		raise C;
+		
+		
+		
+		
+		\end{lstlisting} & 
+		\begin{lstlisting}
+		//events are transformed
+		//G1 is the same expression
+		var __g1 : boolean;
+		__g1 := G1	//maybe transformed further
+		if (g1) {
+			raise B;
+			raise C;
+		}
+		else {
+			raise C;
+		}\end{lstlisting} \\
+		\bottomrule
+		\multicolumn{2}{l}{NOTE: the names of low-level variables are automatically generated and may be different}
+	\end{tabular}
+	\caption{Examples of if statement transformations}
+	\label{tab:SCLLIfStatementExample}
+\end{table}
+
+\bigskip
+\textbf{Choice Statements} are transformed into choice statements. The guards are extracted into separate local boolean-valued variables (thus supporting access expressions), which then replace the original guards. The branches of the choice statement contain the transformed images of the original actions. 
+
+To be able to support the transformation of for statements, switch statements and procedure declarations -- that can have break and return statements as elements --, the actions after the statement are placed in each of the branches, and also an extra if statement is added, similarly to the extra else branch at the transformation of the if statement, which is only supposed to run when none of the branches of the choice statement could. For this reason, an additional local flag-variable must be added to the result of the transformation.
+
+\begin{table}[ht]
+	\footnotesize
+	\centering
+	\begin{tabular}{ p{7cm} p{7cm} }
+		\toprule
+		High-level & Low-level \\
+		\midrule
+		\begin{lstlisting}
+		//events are declared
+		//G1 and G2 are boolean-type expressions
+		choice {
+			branch [G1] raise A;
+			branch [G2] raise B;
+		}
+		raise C;
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		\end{lstlisting} & 
+		\begin{lstlisting}
+		//events are transformed
+		//G1 and G2 are also transformed
+		var __g1 : boolean;
+		__g1 := G1; //maybe transformed further
+		var __g2 : boolean;
+		__g2 := G2; //maybe transformed further
+		var __flag : boolean := false;
+		choice {
+			branch [__g1] {
+				__flag := true;
+				raise A;
+				raise C;
+			}
+			branch [__g2] {
+				__flag := true;
+				raise B;
+				raise C;
+			}
+		}
+		if (__flag) {
+			raise C;
+		}\end{lstlisting} \\
+		\bottomrule
+		\multicolumn{2}{l}{NOTE: the names of low-level variables are automatically generated and may be different}
+	\end{tabular}
+	\caption{Examples of choice statement transformations}
+	\label{tab:SCLLChoiceStatementExample}
+\end{table}
+
+\bigskip
+\textbf{Break Statements} do not have any images in the transformed models. They simply affect the contents of the the choices (if and choice statements) that are the results of transformations of for and switch statements. For an example of break statements on the low-level models, see Table \ref{tab:SCLLForStatementExample};
+
+\bigskip
+\textbf{Return Statements} are transformed into assignment statements in the low-level models, if the type of the containing procedure is non-void, or simply have an effect on the choices (if and choice statements) that are the results of transformations of the corresponding procedure declarations. For examples of return statement transformations (along with the containing procedure), see Table \ref{tab:SCLLProcedureDeclarationExample}.
+
+\bigskip
+\textbf{Switch Statements} are transformed into if statements. For the control variable and each of the guards a variable is declared and assigned (to be able to support access expressions), then an if statement is created, which has guards comparing these variables, and bodies that contain the actions of the body of the switch-branch of the same index and \textit{all subsequent switch-branches} (fall-through). The default branch is transformed into an else branch, if exists, or a default branch is defined when none exists. As a break statement can occur anywhere inside a switch statement, which determines the occurrence and execution of other language elements, the rest of the execution is explicitly defined for each case using additional if statements.
+
+\begin{table}[H]
+	\footnotesize
+	\centering
+	\begin{tabular}{ p{7cm} p{7cm} }
+		\toprule
+		High-level & Low-level \\
+		\midrule
+		\begin{lstlisting}
+		//variables a, b defined
+		//events declared
+		switch (5) {
+			case a : {
+				raise A;
+			}
+			case b : {
+				raise B;
+				break;
+			}
+			default : {
+				raise C;
+			}
+		}
+		raise D;
+		
+		
+		
+		
+		
+		
+		
+		\end{lstlisting} & 
+		\begin{lstlisting}
+		//the variable and event images exist
+		var __control : integer;
+		__control := 5;
+		var __guard1 : integer;
+		__guard1 := a;
+		var __guard2 : integer;
+		__guard2 := b;
+		if (__guard1 = __control) {
+			raise A;
+			raise B;
+			raise D;
+		} 
+		else if (__guard2 = __control) {
+			raise B;
+			raise D;
+		}
+		else if (true) {
+			raise C;
+			raise D;
+		}
+		else if (true) {
+			raise D;
+		}\end{lstlisting} \\
+		\bottomrule
+		\multicolumn{2}{l}{NOTE: the names of low-level variables are automatically generated and may be different}
+	\end{tabular}
+	\caption{Examples of switch statement transformations}
+	\label{tab:SCLLSwitchStatementExample}
+\end{table}
+
+\bigskip
+\textbf{For Statements} are \textit{unrolled} in the low-level models, i.e. for each parameter value, the parameter variable is assigned to the corresponding value -- this means a generated variable declaration beforehand -- and the body of the statement is executed under this precondition. The contents of this unrolled for statement are then transformed according to the other transformation rules. As a break statement can occur anywhere inside a for statement, which determines the occurrence and execution of other language elements, the execution is explicitly defined for each contained (deterministic or non-deterministic) choice using if and choice statements.
+
+\begin{table}[H]
+	\footnotesize
+	\centering
+	\begin{tabular}{ p{7cm} p{7cm} }
+		\toprule
+		High-level & Low-level \\
+		\midrule
+		\begin{lstlisting}
+		//variable myArray is []{1, 2}
+		//variable cnt is declared
+		for (p : integer in myArray) {
+			cnt := cnt + 1;
+		}
+		\end{lstlisting} & 
+		\begin{lstlisting}
+		//the variable transformations exist
+		var p : integer;
+		p := 1;	//first array element is 1
+		{ cnt := cnt + 1; }
+		p := 2;	//second array element is 2
+		{ cnt := cnt + 1; }\end{lstlisting} \\
+		\begin{lstlisting}
+		//variables and events declared
+		for (p : integer in [0 .. 1]) {
+			raise A
+			if (p = 1) {
+				raise B;
+				break;
+			} 
+			raise C;
+		}
+		then {
+			raise D;
+		}
+		
+		
+		
+		
+		
+		
+		
+		
+		\end{lstlisting} & 
+		\begin{lstlisting}
+		//the variable and event transformations
+		//exist
+		var p : integer;
+		p := 0;
+		raise A;
+		if (p = 1) {
+			raise B;
+		}
+		else {
+			raise C;
+			p := 1;		//start of next inline pass
+			raise A;
+			if (p = 1) {
+				raise B;
+			}
+			else {
+				raise C;
+				//No more parameter values -> then
+				raise D;
+			}
+		}\end{lstlisting} \\
+		\bottomrule
+		\multicolumn{2}{l}{NOTE: the names of low-level variables are automatically generated and may be different}
+	\end{tabular}
+	\caption{Examples of for statement transformations}
+	\label{tab:SCLLForStatementExample}
+\end{table}
+
+\bigskip
+\textbf{Assertion Statements} are transformed to assertion statements. The contained expression is also transformed by extracting it into a separate, temporary variable (to support access expressions). In the low-level assertion statement, a reference to this variable is going to be the assertion expression.
+
+\begin{table}[ht]
+	\footnotesize
+	\centering
+	\begin{tabular}{ p{7cm} p{7cm} }
+		\toprule
+		High-level & Low-level \\
+		\midrule
+		\begin{lstlisting}
+		//G1 is a boolean-type expression
+		assert(G1);
+		
+		\end{lstlisting} & 
+		\begin{lstlisting}
+		//G1 is transformed
+		var __g1 : boolean;
+		__g1 := G1;	//maybe transformed further
+		assert(__g1);\end{lstlisting} \\
+		\bottomrule
+		\multicolumn{2}{l}{NOTE: the names of low-level variables are automatically generated and may be different}
+	\end{tabular}
+	\caption{Examples of assertion statement transformations}
+	\label{tab:SCLLAssertionStatementExample}
+\end{table}
+
+%----------------------------------------------------------------------------
+\subsection{Other Elements}
+
+\bigskip
+\textbf{Empty Statements} are transformed into empty statements. They represent no behavior in the low-level models either, but are the result of the transformation of several other language elements. For an example of transformations resulting in empty statements, see Table \ref{tab:SCLLExpressionStatementExample};
+
+\bigskip
+\textbf{Procedure Declarations} are \textit{inlined} into the transition where the procedure was called from. This inlining is possible, as the problem of infinite recursion was already addressed. In case the procedure is of non-void type, a return variable is declared. The (images of the) parameters are assigned the corresponding arguments of the calling expression. The contents of this inlined procedure are then transformed according to the other transformation rules. As a return statement -- which assigns a value to the return variable and ends the execution of the actions inside the procedure -- can occur anywhere inside a procedure declaration, which determines the occurrence and execution of other language elements, the execution is explicitly defined for each possible choice using if and choice statements.
+
+An example for the transformation of procedure declarations can be seen in Table \ref{tab:SCLLProcedureDeclarationExample}. Another example is in Table \ref{tab:SCLLExpressionStatementExample};
+
+\begin{table}[ht]
+	\footnotesize
+	\centering
+	\begin{tabular}{ p{7cm} p{7cm} }
+		\toprule
+		High-level & Low-level \\
+		\midrule
+		\begin{lstlisting}
+		//place of calling:
+		var a : integer;
+		a := proc(2);
+		
+		//the procedure declaration:
+		procedure proc(param : integer) : integer {
+			return param * 2;
+		}
+		
+		\end{lstlisting} & 
+		\begin{lstlisting}
+		//image of the place of calling:
+		var a : integer;
+		//the inlined procedure:
+		var __proc_ret : integer;
+		var __proc_param1 : integer;
+		__proc_param1 := 2;
+		{
+			__proc_ret := __proc_param1 * 2;
+		}
+		//
+		a := __proc_ret;\end{lstlisting} \\
+		\bottomrule
+		\multicolumn{2}{l}{NOTE: the names of low-level variables are automatically generated and may be different}
+	\end{tabular}
+	\caption{Example of a procedure declaration transformation}
+	\label{tab:SCLLProcedureDeclarationExample}
+\end{table}
+
+\bigskip
+%----------------------------------------------------------------------------
+\section{XSTS} \label{section_tr_xsts}
+%----------------------------------------------------------------------------
+For the formal verification of the designed systems, currently the transformation to the experimental eXtended Symbolic Transition System (xSTS) formalism of the Theta Framework \cite{ThetaToolPaper} is supported. This formalism contains very low-level constructs: only variables, assignments, assumptions and conditional and parallel branching of the control flow are supported, with an expression language only supporting basic mathematical and logic expressions. This formalism can be easily transformed into SMT formulas, which are used to describe the state changes in the Theta Framework.
+
+\subsection{XSTS syntax}
+The xSTS formalism contains the following elements:
+
+%---
+\textbf{Expressions} are similar to the side-effect free expressions used in the action language, as they are both based on the same metamodel. Compared to the expressions used in the action language, there are no access expressions (as complex data types are not allowed), and cannot have void as type.
+
+%---
+\textbf{Assume Actions} state assumptions about the state of the system at a given point during the execution. They contain boolean-type expressions, which, when evaluated to false, make the assumption fail. On a failed assumption, the whole execution of the action containing the assumption fails and the state modifications up to the assumption are also canceled.
+
+\textbf{Empty Actions} represent no behavior and may be freely removed. They are useful during the transformation of the models.
+
+\textbf{Assignment Actions} represent the same behavior as assignment statements of the action language. They assign the result of the evaluation of the right-hand side expression to a variable given with a reference expression on the left-hand side.
+
+%-----
+\textbf{Sequential Actions} define sequential execution for the contained actions. In this regard, they are similar to blocks of the action language.
+
+\textbf{Non-deterministic Actions} define a non-deterministic choice between their contained actions. 
+
+\textbf{Parallel Actions} define parallel execution for their contained actions.
+
+\bigskip
+\textbf{Transformation of the low-level action language elements:}
+
+In the rest of the section, these low-level-to-xSTS transformations of the language elements are examined. For an overview of the low-level statechart-to-xSTS transformations, see Table \ref{tab:LLXSTSOverview}. 
+
+The example codes for each of the transformations are given through the Gamma action language syntax for the low-level statechart elements and the xSTS syntax for the xSTS elements.
+
+%----------------------------------------------------------------------------
+\subsection{Variable Declarations}
+In the low-level statechart model, only variable declarations are allowed as images of high-level action language elements. These variable declarations need to be transformed into variables of the xSTS models. This transformation is very simple, as the names, types and initializing expressions can take the same values, as those of the low-level model. 
+
+\bigskip
+\textbf{Variable Declaration Statements} are transformed into temporary variable declarations of the xSTS formalism, and are replaced with empty actions at the image of the place of the declaration. 
+
+\begin{table}[h!]
+	\footnotesize
+	\centering
+	\begin{tabular}{ p{7cm} p{7cm} }
+		\toprule
+		High-level & Low-level \\
+		\midrule
+		\begin{lstlisting}
+		{
+			. . .
+			var a : integer := 5;
+			. . .
+		}
+		
+		\end{lstlisting} & 
+		\begin{lstlisting}
+		var _a : integer = 5;	//Global variable
+		---
+		{
+			. . . 
+			//Empty action, later maybe removed
+			. . .
+		}\end{lstlisting} \\
+		\bottomrule
+		\multicolumn{2}{l}{NOTE: the names of the xSTS variables are automatically generated and may be different}
+	\end{tabular}
+	\caption{Example of a variable declaration statement transformation}
+	\label{tab:LLXSTSVariableDeclarationExample}
+\end{table}
+
+%----------------------------------------------------------------------------
+\subsection{Expressions}
+Expressions of low-level statecharts are transformed into expressions of xSTS models. It can be assumed that the low-level model does not contain any expressions requiring the use of actions (e.g. access expressions), thus, they can be easily transformed to xSTS expressions.
+
+\bigskip
+\textbf{Reference Expressions} are transformed into xSTS reference expressions by creating a reference expression referring to the image of the originally referred variable.
+
+\bigskip
+\textbf{Variable Initializing Expressions} can be copied into the xSTS model, as every possible element corresponds to a similar element of the xSTS model.
+
+%----------------------------------------------------------------------------
+\subsection{State Modification Actions}
+\bigskip
+\textbf{Assignment Statements} are transformed into the assignment actions of xSTS models. The expressions on the left-hand side and right-hand side of the action are transformed according to the rules of low-level statechart-to-xSTS expression transformations discussed above.
+
+%----------------------------------------------------------------------------
+\subsection{Control Flow Statements}
+\bigskip
+\textbf{Blocks} are transformed into the sequential actions of the xSTS formalism. These sequential actions -- similarly to blocks -- define seqential execution for the contained actions. 
+
+%\begin{table}[H]
+%	\footnotesize
+%	\centering
+%	\begin{tabular}{ p{7cm} p{7cm} }
+%		\toprule
+%		High-level & Low-level \\
+%		\midrule
+%		\begin{lstlisting}
+%		{
+%			. . .
+%		}\end{lstlisting} & 
+%		\begin{lstlisting}
+%		{
+%			. . .
+%		}\end{lstlisting} \\
+%		\bottomrule
+%		\multicolumn{2}{l}{NOTE: the names of the xSTS variables are automatically generated and may be different}
+%	\end{tabular}
+%	\caption{Example of a block transformation}
+%	\label{tab:LLXSTSBlockExample}
+%\end{table}
+
+\bigskip
+\textbf{If Statements} are transformed into non-deterministic choices (actions) and assume actions in xSTS models. Each branch of the non-deterministic action contains all images of the actions of the corresponding if-branch and is guarded with its own guard conjoint with the negated guards of all the previous branches.
+
+\begin{table}[H]
+	\footnotesize
+	\centering
+	\begin{tabular}{ p{7cm} p{7cm} }
+		\toprule
+		High-level & Low-level \\
+		\midrule
+		\begin{lstlisting}
+		//G1 is a boolean-type expression
+		//'a' and 'b' are defined 
+		if (G1) {
+			a := b;
+		}\end{lstlisting} & 
+		\begin{lstlisting}
+		//G1, a and b transformed
+		choice {
+			assume (G1);
+			a := b;
+		}\end{lstlisting} \\
+		\begin{lstlisting}
+		//G1, G2 and G3 are boolean-type 
+		//expressions, 'a' is declared
+		if (G1) {
+			a := 1;
+		}
+		else if (G2) {
+			a := 2;
+		}
+		else {
+			a := 3;
+		}
+		\end{lstlisting} & 
+		\begin{lstlisting}
+		//G1, G2 and G2 are transformed
+		//'a' is transformed
+		choice {
+			assume (G1);
+			a := 1;
+		} or {
+			assume (!G1 && G2);
+			a := 2;
+		} or {
+			assume (!G1 && !G2 && true);
+			a := 3;
+		}\end{lstlisting} \\
+		\bottomrule
+		\multicolumn{2}{l}{NOTE: the names of the xSTS variables are automatically generated and may be different}
+	\end{tabular}
+	\caption{Example of an if statement transformation}
+	\label{tab:LLXSTSIfStatementExample}
+\end{table}
+
+\bigskip
+\textbf{Choice Statements} are transformed into non-deterministic choices (actions) and assume actions of the xSTS formalism. The actions of the non-deterministic choice correspond to the branches of the choice statement and the assume actions arise from the transformation of the guards of its branches.
+
+\begin{table}[H]
+	\footnotesize
+	\centering
+	\begin{tabular}{ p{7cm} p{7cm} }
+		\toprule
+		High-level & Low-level \\
+		\midrule
+		\begin{lstlisting}
+		//G1, G2 and G3 are boolean-type 
+		//expressions, 'a' is declared
+		choice {
+			branch [G1] a := 1;
+			branch [G2] a := 2;
+			branch [G2] a := 3;
+		}
+		
+		
+		
+		
+		\end{lstlisting} & 
+		\begin{lstlisting}
+		//G1, G2 and G2 are transformed
+		//'a' is transformed
+		choice {
+			assume (G1);
+			a := 1;
+		} or {
+			assume (G2);
+			a := 2;
+		} or {
+			assume (G3); 
+			a := 3;
+		}\end{lstlisting} \\
+		\bottomrule
+		\multicolumn{2}{l}{NOTE: the names of the xSTS variables are automatically generated and may be different}
+	\end{tabular}
+	\caption{Example of a choice statement transformation}
+	\label{tab:LLXSTSChoicesStatementExample}
+\end{table}
+
+\bigskip
+\textbf{Assertion Statements} are transformed into assume actions of the xSTS formalism. As the syntax and semantics of the assertion statement are similar to the syntax and semantics of the assume action, only the contained expression needs further transformation.
+
+\begin{table}[H]
+	\footnotesize
+	\centering
+	\begin{tabular}{ p{7cm} p{7cm} }
+		\toprule
+		High-level & Low-level \\
+		\midrule
+		\begin{lstlisting}
+		//G1 is an expression
+		assert(G1);\end{lstlisting} & 
+		\begin{lstlisting}
+		//G1 is transformed
+		assume(G1);\end{lstlisting} \\
+		\bottomrule
+	\end{tabular}
+	\caption{Example of an assume statement transformation}
+	\label{tab:LLXSTSAssumeStatementExample}
+\end{table}
+
+%----------------------------------------------------------------------------
+\subsection{Other Elements}
+\bigskip
+\textbf{Empty Actions} are transformed into empty actions of the xSTS formalism. Empty actions are similar to empty statements, they do not represent any behavior and can be removed.
+
+%----------------------------------------------------------------------------
+\section{Executable code} \label{section_tr_java}
+%----------------------------------------------------------------------------
+Java code is generated using the xSTS and the high-level statechart models, according to object-oriented principles. For every component, three Java classes are generated: an \textit{interface-class}, which contains the elements on the interface of the statechart (which are publicly accessible from the outside world), a \textit{statemachine-class}, which contains the logic in the statechart using low-level elements, and a \textit{statechart-class}, which is a wrapper for the statemachine according to the elements of the original statechart model. The statemachine class is generated based on the xSTS model, the statechart class and the interfaces are generated based on the high-level statechart models.
+
+The details of the Java code generation are omitted here, as it is entirely done by the Gamma Framework. It is capable of the transformation of the behavior without having to explicitly define the transformation of the action language elements due to the behavior being extracted from xSTS actions, which are independent from the action language proposed in this work -- but are the targets of their transformations. For this reason, the details of this Gamma statechart-to-Java transformation are not discussed here, for that we refer the reader to \cite{BenceDipterv, GammaVince2018}. 
